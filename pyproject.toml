@@ -11,17 +11,17 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Keerthivasan Sankar (Rambo)" }]
 dependencies = [
-    "cryptography>=42.0.0,<44.0.0",
+    "cryptography>=42.0.0,<45.0.0",
 ]
 
 [project.optional-dependencies]
-pqc = ["liboqs-python>=0.10.0,<0.12.0"]
+pqc = ["liboqs-python>=0.10.0,<1.0.0"]
 dev = ["pytest>=8.0.0"]
 
 [project.urls]
-Homepage = "https://github.com/keerthivasan-sankar/crypto_flex"
-Repository = "https://github.com/keerthivasan-sankar/crypto_flex"
-Issues = "https://github.com/keerthivasan-sankar/crypto_flex/issues"
+Homepage = "https://github.com/keerthivasan-sankar/testing-"
+Repository = "https://github.com/keerthivasan-sankar/testing-"
+Issues = "https://github.com/keerthivasan-sankar/testing-/issues"
 
 [tool.setuptools.packages.find]
 include = ["cryptoflex*"]

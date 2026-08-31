@@ -4,8 +4,8 @@
 
 | Package | Version Constraint | Role | Security Relevance |
 |---------|-------------------|------|-------------------|
-| `cryptography` | `>=42.0.0,<44.0.0` | Provides X25519 ECDH, HKDF-SHA384, AES-256-GCM | **Critical** — all classical crypto and AEAD operations |
-| `liboqs-python` | `>=0.10.0,<0.12.0` (optional) | Python wrapper for liboqs C library | **Critical** — provides ML-KEM-768/1024 post-quantum KEM |
+| `cryptography` | `>=42.0.0,<45.0.0` | Provides X25519 ECDH, HKDF-SHA384, AES-256-GCM | **Critical** — all classical crypto and AEAD operations |
+| `liboqs-python` | `>=0.10.0,<1.0.0` (optional) | Python wrapper for liboqs C library | **Critical** — provides ML-KEM-768/1024 post-quantum KEM |
 | `pytest` | `>=8.0.0` (dev only) | Test framework | Not shipped |
 
 ## Transitive Dependencies (Security-Relevant)
@@ -19,7 +19,7 @@
 ## Native Library Requirements
 
 ### liboqs (Post-Quantum)
-- **Required version**: liboqs 0.10.x or 0.11.x (matching liboqs-python pin)
+- **Required version**: liboqs 0.10.x+ (matching liboqs-python release)
 - **Architecture**: Must match Python interpreter architecture (x86_64 / arm64)
 - **Build**: Pre-built binaries preferred over import-time compilation
 - **Supply chain**: Pin to a specific release tag; verify against OQS project GPG signatures

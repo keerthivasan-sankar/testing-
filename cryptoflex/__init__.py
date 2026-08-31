@@ -21,6 +21,12 @@ from .api import (
 )
 from .errors import DecryptionError, DowngradeError
 from .header import CryptoflexHeader, HeaderParseError
+from .keystore import (
+    deserialize_public_bundle,
+    export_keyset_bytes,
+    import_keyset_bytes,
+    serialize_public_bundle,
+)
 from .policy import Constraint, PolicyDecision, PolicyEngine
 from .profiles import PROFILES, SecurityProfile, get_profile
 from .sources import (
@@ -30,13 +36,22 @@ from .sources import (
     SecuritySource,
     SourceUnavailableError,
 )
+from .streaming import decrypt_stream, encrypt_stream
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # high-level AEAD API (recommended)
     "encrypt",
     "decrypt",
+    # streaming AEAD API (large files)
+    "encrypt_stream",
+    "decrypt_stream",
+    # password-encrypted keystore
+    "export_keyset_bytes",
+    "import_keyset_bytes",
+    "serialize_public_bundle",
+    "deserialize_public_bundle",
     # low-level key derivation
     "establish_keys",
     "derive_root_key",

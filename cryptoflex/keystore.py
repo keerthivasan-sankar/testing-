@@ -28,7 +28,7 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from .api import KeySet, PublicBundle
 from .errors import DecryptionError
-from .policy import Constraint, PolicyDecision
+from .policy import PolicyDecision
 from .profiles import get_profile
 
 MAGIC_KEYSTORE = b"CFLK"

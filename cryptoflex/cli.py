@@ -130,7 +130,7 @@ def main(args: list[str] | None = None) -> int:
             print("==================================================")
             print(f"  cryptoflex File Header Inspection: {parsed.file}")
             print("==================================================")
-            print(f"Magic               : CFLX")
+            print("Magic               : CFLX")
             print(f"Header Version      : {header.version}")
             print(f"Profile ID          : {header.profile_id}")
             print(f"Header Consumed     : {consumed} bytes")

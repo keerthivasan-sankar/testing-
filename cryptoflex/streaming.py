@@ -106,9 +106,6 @@ def decrypt_stream(
     Validates header, min_profile, per-chunk AEAD tags, and sequence order.
     Raises DecryptionError or DowngradeError on failure.
     """
-    # Read magic and parse header
-    header_bytes_buffer = bytearray()
-
     # Read initial bytes to parse header
     initial_bytes = input_stream.read(4096)
     if not initial_bytes:

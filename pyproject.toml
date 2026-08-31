@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cryptoflex"
+version = "0.2.0"
+description = "A local-first crypto-agility policy engine: orchestrates classical + post-quantum primitives behind a decision layer, with zero network dependency."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Keerthivasan Sankar (Rambo)" }]
+dependencies = [
+    "cryptography>=42.0.0,<44.0.0",
+]
+
+[project.optional-dependencies]
+pqc = ["liboqs-python>=0.10.0,<0.12.0"]
+dev = ["pytest>=8.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/keerthivasan-sankar/crypto_flex"
+Repository = "https://github.com/keerthivasan-sankar/crypto_flex"
+Issues = "https://github.com/keerthivasan-sankar/crypto_flex/issues"
+
+[tool.setuptools.packages.find]
+include = ["cryptoflex*"]
+
+[tool.setuptools.package-data]
+cryptoflex = ["algorithm_status.json"]

@@ -1,0 +1,63 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package (dev deps)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (pyflakes)
+        run: |
+          pip install pyflakes
+          python -m pyflakes cryptoflex/
+
+      - name: Run tests (PQC disabled — no liboqs compile in CI)
+        env:
+          CRYPTOFLEX_DISABLE_PQC: "1"
+        run: pytest -v
+
+  test-with-real-pqc:
+    # Exercises the actual PQCSource/liboqs code path, not just
+    # MockPQCSource — installing liboqs via apt is far faster than
+    # letting liboqs-python compile it from source on import.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install liboqs (apt, prebuilt — avoids from-source compile)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liboqs-dev || echo "liboqs-dev not in apt on this runner image; falling back to source build via pip"
+
+      - name: Install package with PQC extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,pqc]"
+
+      - name: Run full test suite against real liboqs
+        run: pytest -v

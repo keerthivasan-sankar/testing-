@@ -38,8 +38,9 @@ from .sources import (
     SourceUnavailableError,
 )
 from .streaming import decrypt_stream, encrypt_stream
+from .utils import zeroize
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __all__ = [
     # high-level AEAD API (recommended for file encryption)
@@ -57,6 +58,8 @@ __all__ = [
     "import_keyset_bytes",
     "serialize_public_bundle",
     "deserialize_public_bundle",
+    # memory security
+    "zeroize",
     # low-level key derivation
     "establish_keys",
     "derive_root_key",

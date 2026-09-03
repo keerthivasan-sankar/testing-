@@ -212,9 +212,12 @@ class PQCSource(SecuritySource):
 
     def encapsulate(self, peer_public_key: bytes) -> Encapsulation:
         self._require_available()
-        with oqs.KeyEncapsulation(self.kem_name) as kem:
+        kem = oqs.KeyEncapsulation(self.kem_name)
+        try:
             ciphertext, shared_secret = kem.encap_secret(peer_public_key)
             return Encapsulation(ciphertext=ciphertext, shared_secret=shared_secret)
+        finally:
+            kem.free()
 
     def decapsulate(self, private_key_handle: object, ciphertext: bytes) -> bytes:
         self._require_available()

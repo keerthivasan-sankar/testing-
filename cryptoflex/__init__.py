@@ -19,6 +19,7 @@ from .api import (
     establish_keys,
     recover_root_key,
 )
+from .ephemeral import WireMessage, ephemeral_decrypt, ephemeral_encrypt
 from .errors import DecryptionError, DowngradeError
 from .header import CryptoflexHeader, HeaderParseError
 from .keystore import (
@@ -38,12 +39,16 @@ from .sources import (
 )
 from .streaming import decrypt_stream, encrypt_stream
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
-    # high-level AEAD API (recommended)
+    # high-level AEAD API (recommended for file encryption)
     "encrypt",
     "decrypt",
+    # ephemeral / forward-secret messaging API
+    "ephemeral_encrypt",
+    "ephemeral_decrypt",
+    "WireMessage",
     # streaming AEAD API (large files)
     "encrypt_stream",
     "decrypt_stream",

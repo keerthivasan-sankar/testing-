@@ -43,7 +43,7 @@ def _derive_wrapping_key(password: str | bytes, salt: bytes) -> bytes:
     kdf = Scrypt(
         salt=salt,
         length=KEY_LEN,
-        n=2**15,
+        n=2**17,  # OWASP minimum; was 2**15 in v0.3.0
         r=8,
         p=1,
     )
@@ -80,7 +80,7 @@ def export_keyset_bytes(keyset: KeySet, password: str | bytes) -> bytes:
         try:
             priv_bytes = source.serialize_private(priv_handle)
         except Exception as e:
-            raise TypeError(f"cannot serialize private handle for '{alg_id}': {e}") from e
+            raise DecryptionError(f"cannot serialize private handle for '{alg_id}'") from e
 
         serialized_privates.append(
             {"alg_id": alg_id, "priv_b64": base64.b64encode(priv_bytes).decode("ascii")}

@@ -2,18 +2,25 @@
 cryptoflex.cli
 ===============
 
-Command Line Interface for cryptoflex v0.3.0.
+Command Line Interface for cryptoflex v0.4.0.
 
 Usage:
-  cryptoflex keygen --key key.cflk --bundle bundle.json --password PASS
+  cryptoflex keygen --key key.cflk --bundle bundle.json [--password PASS]
   cryptoflex encrypt --in input.dat --out output.cflx --bundle bundle.json [--stream]
-  cryptoflex decrypt --in output.cflx --out restored.dat --key key.cflk --password PASS [--min-profile PROFILE] [--stream]
+  cryptoflex decrypt --in output.cflx --out restored.dat --key key.cflk [--password PASS] [--min-profile PROFILE] [--stream]
   cryptoflex info input.cflx
+
+Password handling (in order of precedence):
+  1. CRYPTOFLEX_PASSWORD environment variable
+  2. --password flag (WARNING: visible in process list on shared systems)
+  3. Interactive getpass prompt (safest, used when neither above is set)
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
+import os
 import sys
 
 from .api import decrypt, encrypt, establish_keys
@@ -28,6 +35,21 @@ from .policy import Constraint
 from .streaming import decrypt_stream, encrypt_stream
 
 
+def _resolve_password(parsed_password: str | None, prompt: str) -> str:
+    """Resolve password from env var, --password flag (with warning), or interactive prompt."""
+    env_pw = os.environ.get("CRYPTOFLEX_PASSWORD")
+    if env_pw:
+        return env_pw
+    if parsed_password is not None:
+        print(
+            "WARNING: --password visible in process list. "
+            "Use CRYPTOFLEX_PASSWORD env var or omit for interactive prompt.",
+            file=sys.stderr,
+        )
+        return parsed_password
+    return getpass.getpass(prompt)
+
+
 def main(args: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="cryptoflex",
@@ -39,7 +61,7 @@ def main(args: list[str] | None = None) -> int:
     p_keygen = subparsers.add_parser("keygen", help="Generate a fresh keypair and password-encrypt the private keyset")
     p_keygen.add_argument("--key", required=True, help="Output path for password-encrypted KeySet (.cflk)")
     p_keygen.add_argument("--bundle", required=True, help="Output path for PublicBundle (.json)")
-    p_keygen.add_argument("--password", required=True, help="Passphrase to encrypt the private key file")
+    p_keygen.add_argument("--password", default=None, help="Passphrase (use CRYPTOFLEX_PASSWORD env var or omit for prompt)")
     p_keygen.add_argument(
         "--constraint",
         choices=["fast", "balanced", "max_security"],
@@ -59,7 +81,7 @@ def main(args: list[str] | None = None) -> int:
     p_dec.add_argument("--in", dest="input_path", required=True, help="Encrypted file path (.cflx)")
     p_dec.add_argument("--out", dest="output_path", required=True, help="Output restored file path")
     p_dec.add_argument("--key", required=True, help="Password-encrypted KeySet file path (.cflk)")
-    p_dec.add_argument("--password", required=True, help="Passphrase to unlock private key file")
+    p_dec.add_argument("--password", default=None, help="Passphrase (use CRYPTOFLEX_PASSWORD env var or omit for prompt)")
     p_dec.add_argument("--min-profile", help="Minimum required profile ID to prevent downgrades")
     p_dec.add_argument("--stream", action="store_true", help="Use chunked streaming mode for large files")
 
@@ -71,6 +93,7 @@ def main(args: list[str] | None = None) -> int:
 
     try:
         if parsed.command == "keygen":
+            password = _resolve_password(parsed.password, "Enter new keyset password: ")
             constraint = Constraint(parsed.constraint)
             keyset = establish_keys(constraint=constraint)
 
@@ -78,7 +101,7 @@ def main(args: list[str] | None = None) -> int:
             with open(parsed.bundle, "w", encoding="utf-8") as f:
                 f.write(bundle_json)
 
-            keyset_bytes = export_keyset_bytes(keyset, parsed.password)
+            keyset_bytes = export_keyset_bytes(keyset, password)
             with open(parsed.key, "wb") as f:
                 f.write(keyset_bytes)
 
@@ -105,9 +128,10 @@ def main(args: list[str] | None = None) -> int:
             return 0
 
         elif parsed.command == "decrypt":
+            password = _resolve_password(parsed.password, "Enter keyset password: ")
             with open(parsed.key, "rb") as f:
                 key_bytes = f.read()
-            keyset = import_keyset_bytes(key_bytes, parsed.password)
+            keyset = import_keyset_bytes(key_bytes, password)
 
             if parsed.stream:
                 with open(parsed.input_path, "rb") as fin, open(parsed.output_path, "wb") as fout:
@@ -124,7 +148,7 @@ def main(args: list[str] | None = None) -> int:
 
         elif parsed.command == "info":
             with open(parsed.file, "rb") as f:
-                data = f.read(4096)
+                data = f.read(65536)  # 64 KB — enough for any realistic header
             header, consumed = CryptoflexHeader.from_bytes(data)
 
             print("==================================================")

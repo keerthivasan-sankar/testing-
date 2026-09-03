@@ -237,7 +237,8 @@ def encrypt(bundle: PublicBundle, plaintext: bytes) -> bytes:
 
     header_bytes = derived.header.to_bytes()
     nonce = derived.header.nonce
-    assert nonce is not None  # v2 headers always have a nonce
+    if nonce is None:  # v2 headers always have a nonce
+        raise ValueError("derive_root_key() produced a v1 header with no nonce — cannot encrypt")
 
     aesgcm = AESGCM(derived.root_key)
     ct_with_tag = aesgcm.encrypt(nonce, plaintext, header_bytes)

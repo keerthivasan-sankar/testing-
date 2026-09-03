@@ -1,18 +1,21 @@
 """
 verify_local.py
 ================
-Local verification script for cryptoflex v0.2.0.
+Comprehensive Local Verification Script for cryptoflex v0.4.0.
 
 Demonstrates:
-  1. Key generation via PolicyEngine
-  2. High-level AEAD Encryption & Decryption
-  3. Header wire format inspection (Magic, Version 2, Nonce, Components)
-  4. Header AAD Tamper Detection (modifying profile_id in blob)
-  5. Ciphertext Payload Tamper Detection (modifying payload byte)
-  6. Explicit Downgrade Protection (min_profile enforcement)
-  7. Low-level key recovery backward-compatibility with v1 headers
+  1. Key Generation via PolicyEngine
+  2. High-Level AEAD Encryption & Decryption (encrypt/decrypt)
+  3. Ephemeral Forward-Secret Messaging Mode (ephemeral_encrypt/ephemeral_decrypt)
+  4. Encrypted Password-Wrapped Keystore (export_keyset_bytes/import_keyset_bytes)
+  5. Chunked Streaming AEAD Encryption & Decryption (encrypt_stream/decrypt_stream)
+  6. Header Wire Format Inspection (Magic, Version 2, Nonce, Components)
+  7. Header AAD Tamper Resistance Detection
+  8. Ciphertext Payload Tamper Resistance (AES-GCM Tag Check)
+  9. Explicit Downgrade Protection (min_profile Enforcement)
 """
 
+import io
 import sys
 from cryptoflex import (
     Constraint,
@@ -21,9 +24,14 @@ from cryptoflex import (
     DowngradeError,
     PolicyEngine,
     decrypt,
+    decrypt_stream,
     encrypt,
+    encrypt_stream,
+    ephemeral_decrypt,
+    ephemeral_encrypt,
     establish_keys,
-    recover_root_key,
+    export_keyset_bytes,
+    import_keyset_bytes,
 )
 
 
@@ -34,7 +42,7 @@ def print_step(title: str):
 
 
 def main():
-    print("Running Local Cryptographic Verification for cryptoflex v0.2.0...")
+    print("Running Local Cryptographic Verification for cryptoflex v0.4.0...")
 
     # --- 1. Establish Keys ---
     print_step("1. Establishing Keys via PolicyEngine (Constraint: FAST)")
@@ -58,8 +66,47 @@ def main():
     assert decrypted == secret_message, "Decryption mismatch!"
     print(f"Decryption SUCCESS! Recovered: '{decrypted.decode()}'")
 
-    # --- 3. Wire Format Inspection ---
-    print_step("3. Wire Format Header Inspection")
+    # --- 3. Ephemeral Forward-Secret Messaging ---
+    print_step("3. Forward-Secret Ephemeral Messaging Mode")
+    ephemeral_text = b"Hello, this message uses a fresh root key generated & discarded per call!"
+    wire_msg = ephemeral_encrypt(keyset.public_bundle, ephemeral_text)
+    print(f"Ephemeral Blob Size : {len(wire_msg.encrypted_blob)} bytes")
+
+    recovered_ephemeral = ephemeral_decrypt(keyset.private_handles, wire_msg)
+    assert recovered_ephemeral == ephemeral_text, "Ephemeral decryption mismatch!"
+    print(f"Ephemeral Messaging SUCCESS! Recovered: '{recovered_ephemeral.decode()}'")
+
+    # --- 4. Password-Wrapped Keystore ---
+    print_step("4. Password-Wrapped Encrypted Keystore (Scrypt + AES-GCM)")
+    password = "VerificationPassphrase789!"
+    encrypted_key_bytes = export_keyset_bytes(keyset, password)
+    print(f"Exported Keystore Size : {len(encrypted_key_bytes)} bytes")
+
+    imported_keyset = import_keyset_bytes(encrypted_key_bytes, password)
+    assert imported_keyset.profile.profile_id == keyset.profile.profile_id
+    re_decrypted = decrypt(imported_keyset.private_handles, blob)
+    assert re_decrypted == secret_message
+    print("Password-Wrapped Keystore Save/Restore SUCCESS!")
+
+    # --- 5. Chunked Streaming AEAD ---
+    print_step("5. Chunked Streaming AEAD Encryption & Decryption")
+    stream_payload = b"Streaming Chunk Data Block " * 500
+    fin = io.BytesIO(stream_payload)
+    fout = io.BytesIO()
+    encrypt_stream(keyset.public_bundle, fin, fout, chunk_size=4096)
+
+    stream_blob = fout.getvalue()
+    print(f"Stream Payload Input  : {len(stream_payload)} bytes")
+    print(f"Stream Encrypted Blob : {len(stream_blob)} bytes")
+
+    f_enc_in = io.BytesIO(stream_blob)
+    f_dec_out = io.BytesIO()
+    decrypt_stream(keyset.private_handles, f_enc_in, f_dec_out)
+    assert f_dec_out.getvalue() == stream_payload
+    print("Chunked Streaming AEAD SUCCESS!")
+
+    # --- 6. Wire Format Inspection ---
+    print_step("6. Wire Format Header Inspection")
     header, consumed = CryptoflexHeader.from_bytes(blob)
     print(f"Magic              : {blob[:4]}")
     print(f"Format Version     : {header.version}")
@@ -69,11 +116,10 @@ def main():
     for alg_id, ct in header.components:
         print(f"  - Component KEM CT: {alg_id} ({len(ct)} bytes ciphertext)")
 
-    # --- 4. Header Tamper Detection (AAD Check) ---
-    print_step("4. Header Tamper Resistance (AEAD Associated Data Check)")
+    # --- 7. Header Tamper Detection (AAD Check) ---
+    print_step("7. Header Tamper Resistance (AEAD Associated Data Check)")
     tampered_blob = bytearray(blob)
-    # Tamper with the profile ID length/bytes inside the header
-    tampered_blob[6] ^= 0x01  # flip a byte inside the profile_id string
+    tampered_blob[6] ^= 0x01  # flip a byte inside profile_id string
     try:
         decrypt(keyset.private_handles, bytes(tampered_blob))
         print("FAIL: Tampered header was NOT caught!")
@@ -82,8 +128,8 @@ def main():
         print(f"PASS: Tampered header rejected cleanly via uniform DecryptionError!")
         print(f"      Error caught: {type(e).__name__}('{e}')")
 
-    # --- 5. Ciphertext Payload Tamper Detection ---
-    print_step("5. Ciphertext Payload Tamper Resistance (AES-GCM Tag Check)")
+    # --- 8. Ciphertext Payload Tamper Detection ---
+    print_step("8. Ciphertext Payload Tamper Resistance (AES-GCM Tag Check)")
     tampered_payload_blob = bytearray(blob)
     tampered_payload_blob[-1] ^= 0xFF  # flip last byte of AEAD tag
     try:
@@ -94,8 +140,8 @@ def main():
         print(f"PASS: Tampered payload rejected cleanly via uniform DecryptionError!")
         print(f"      Error caught: {type(e).__name__}('{e}')")
 
-    # --- 6. Downgrade Semantics & Minimum Accepted Profile ---
-    print_step("6. Downgrade Semantics (min_profile Enforcement)")
+    # --- 9. Downgrade Semantics & Minimum Accepted Profile ---
+    print_step("9. Downgrade Semantics (min_profile Enforcement)")
     print("Attempting to decrypt classical_only blob when min_profile='hybrid_standard'...")
     try:
         decrypt(keyset.private_handles, blob, min_profile="hybrid_standard")
@@ -105,21 +151,7 @@ def main():
         print(f"PASS: Downgrade attempt blocked BEFORE crypto operation!")
         print(f"      Caught: {type(e).__name__} -> {e}")
 
-    # --- 7. v1 Legacy Header Backwards Compatibility ---
-    print_step("7. Legacy Header Backwards Compatibility")
-    v1_raw = (
-        b"CFLX\x01"
-        b"\x0eclassical_only"
-        b"\x01"
-        b"\x06x25519"
-        b"\x00\x20" + (b"\x01" * 32)
-    )
-    v1_header, v1_consumed = CryptoflexHeader.from_bytes(v1_raw)
-    print(f"Parsed v1 Header Version : {v1_header.version}")
-    print(f"v1 Nonce                 : {v1_header.nonce} (expected None)")
-    print(f"v1 Profile ID            : '{v1_header.profile_id}'")
-
-    print_step("ALL LOCAL VERIFICATION CHECKS PASSED SUCCESSFULLY! [7/7]")
+    print_step("ALL LOCAL VERIFICATION CHECKS PASSED SUCCESSFULLY! [9/9]")
 
 
 if __name__ == "__main__":

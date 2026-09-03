@@ -81,6 +81,9 @@ def encrypt_stream(
     output_stream.write(header_bytes)
     aesgcm = AESGCM(derived.root_key)
 
+    # Eagerly drop the derived root key object; aesgcm holds the key internally.
+    del derived
+
     sequence_number = 0
     while True:
         chunk = input_stream.read(chunk_size)
@@ -97,6 +100,8 @@ def encrypt_stream(
 
     # Write terminal marker (0-length chunk)
     output_stream.write(struct.pack(">I", 0))
+
+    del aesgcm  # drop AEAD key reference after stream is fully written
 
 
 def decrypt_stream(
@@ -148,6 +153,9 @@ def decrypt_stream(
 
         root_key = _recover_root_key_internal(private_handles, header, profile)
         aesgcm = AESGCM(root_key)
+
+        # Eagerly drop root key reference; aesgcm holds the key internally.
+        del root_key
     except (DowngradeError, DecryptionError):
         raise
     except Exception:

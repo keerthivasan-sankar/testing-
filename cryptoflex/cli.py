@@ -5,9 +5,10 @@ cryptoflex.cli
 Command Line Interface for cryptoflex v0.4.0.
 
 Usage:
-  cryptoflex keygen --key key.cflk --bundle bundle.json [--password PASS]
+  cryptoflex keygen --key key.cflk --bundle bundle.json [--password PASS] [--kdf {argon2id,scrypt}]
   cryptoflex encrypt --in input.dat --out output.cflx --bundle bundle.json [--stream]
   cryptoflex decrypt --in output.cflx --out restored.dat --key key.cflk [--password PASS] [--min-profile PROFILE] [--stream]
+  cryptoflex migrate --in input.cflx --out migrated.cflx --key key.cflk --new-bundle new_bundle.json [--password PASS]
   cryptoflex info input.cflx
 
 Password handling (in order of precedence):
@@ -63,6 +64,12 @@ def main(args: list[str] | None = None) -> int:
     p_keygen.add_argument("--bundle", required=True, help="Output path for PublicBundle (.json)")
     p_keygen.add_argument("--password", default=None, help="Passphrase (use CRYPTOFLEX_PASSWORD env var or omit for prompt)")
     p_keygen.add_argument(
+        "--kdf",
+        choices=["argon2id", "scrypt"],
+        default="argon2id",
+        help="Keystore password key derivation algorithm (default: argon2id)",
+    )
+    p_keygen.add_argument(
         "--constraint",
         choices=["fast", "balanced", "max_security"],
         default="balanced",
@@ -85,6 +92,14 @@ def main(args: list[str] | None = None) -> int:
     p_dec.add_argument("--min-profile", help="Minimum required profile ID to prevent downgrades")
     p_dec.add_argument("--stream", action="store_true", help="Use chunked streaming mode for large files")
 
+    # --- MIGRATE ---
+    p_mig = subparsers.add_parser("migrate", help="Re-encrypt a .cflx file under a new PublicBundle (offline migration)")
+    p_mig.add_argument("--in", dest="input_path", required=True, help="Existing encrypted file path (.cflx)")
+    p_mig.add_argument("--out", dest="output_path", required=True, help="Migrated output file path (.cflx)")
+    p_mig.add_argument("--key", required=True, help="Current KeySet file path (.cflk)")
+    p_mig.add_argument("--new-bundle", required=True, help="Target new PublicBundle JSON file path")
+    p_mig.add_argument("--password", default=None, help="Passphrase for KeySet")
+
     # --- INFO ---
     p_info = subparsers.add_parser("info", help="Inspect metadata from a .cflx encrypted file header")
     p_info.add_argument("file", help="Path to .cflx file")
@@ -101,11 +116,12 @@ def main(args: list[str] | None = None) -> int:
             with open(parsed.bundle, "w", encoding="utf-8") as f:
                 f.write(bundle_json)
 
-            keyset_bytes = export_keyset_bytes(keyset, password)
+            use_argon2 = parsed.kdf == "argon2id"
+            keyset_bytes = export_keyset_bytes(keyset, password, use_argon2=use_argon2)
             with open(parsed.key, "wb") as f:
                 f.write(keyset_bytes)
 
-            print(f"Keypair generated under profile '{keyset.profile.profile_id}'.")
+            print(f"Keypair generated under profile '{keyset.profile.profile_id}' (KDF: {parsed.kdf}).")
             print(f"  Public bundle saved to: {parsed.bundle}")
             print(f"  Encrypted key saved to: {parsed.key}")
             return 0
@@ -144,6 +160,27 @@ def main(args: list[str] | None = None) -> int:
                     fout.write(plaintext)
 
             print(f"Successfully decrypted '{parsed.input_path}' -> '{parsed.output_path}'")
+            return 0
+
+        elif parsed.command == "migrate":
+            password = _resolve_password(parsed.password, "Enter keyset password: ")
+            with open(parsed.key, "rb") as f:
+                key_bytes = f.read()
+            keyset = import_keyset_bytes(key_bytes, password)
+
+            with open(parsed.new_bundle, "r", encoding="utf-8") as f:
+                new_bundle = deserialize_public_bundle(f.read())
+
+            with open(parsed.input_path, "rb") as fin:
+                blob = fin.read()
+
+            plaintext = decrypt(keyset.private_handles, blob)
+            migrated_blob = encrypt(new_bundle, plaintext)
+
+            with open(parsed.output_path, "wb") as fout:
+                fout.write(migrated_blob)
+
+            print(f"Successfully migrated '{parsed.input_path}' to target bundle profile '{new_bundle.profile_id}' -> '{parsed.output_path}'")
             return 0
 
         elif parsed.command == "info":

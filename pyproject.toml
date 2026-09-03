@@ -25,9 +25,9 @@ dev = [
 cryptoflex = "cryptoflex.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/keerthivasan-sankar/testing-"
-Repository = "https://github.com/keerthivasan-sankar/testing-"
-Issues = "https://github.com/keerthivasan-sankar/testing-/issues"
+Homepage = "https://github.com/keerthivasan-sankar/crypto_flex"
+Repository = "https://github.com/keerthivasan-sankar/crypto_flex"
+Issues = "https://github.com/keerthivasan-sankar/crypto_flex/issues"
 
 [tool.setuptools.packages.find]
 include = ["cryptoflex*"]

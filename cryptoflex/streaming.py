@@ -216,3 +216,25 @@ def decrypt_stream(
     finally:
         from .utils import zeroize
         zeroize(root_key_buf)
+
+
+def migrate_stream(
+    private_handles: list[object],
+    input_stream: BinaryIO,
+    output_stream: BinaryIO,
+    new_bundle: PublicBundle,
+    *,
+    min_profile: str | None = None,
+) -> None:
+    """Re-encrypt a chunked binary stream under a new PublicBundle (offline migration).
+
+    Decrypts input_stream using private_handles and re-encrypts the stream
+    into output_stream under new_bundle.
+    """
+    import tempfile
+
+    with tempfile.TemporaryFile() as tmp:
+        decrypt_stream(private_handles, input_stream, tmp, min_profile=min_profile)
+        tmp.seek(0)
+        encrypt_stream(new_bundle, tmp, output_stream)
+
